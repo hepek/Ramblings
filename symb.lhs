@@ -116,16 +116,19 @@ derivative. Both work by simple pattern matching over our Expr AST.
 
 
 >d :: (Floating a) => String -> Expr a -> Expr a
+>d x (Atom a)   = 0
 >d x (Sum a b)  = d x a + d x b
 >d x (Prod a b) = (d x a * b) + (a * d x b)
->d x (Atom a)   = 0
+>d x (Rec a)    = - (d x a)/(a * a)
 >d x (Neg a)    = -(d x a)
 >d x (Log a)    = 1/a * (d x a)
 >d x (Sin a)    = (cos a)*(d x a)
 >d x (Cos a)    = -(sin a)*(d x a)
 >d x (Exp E b)  = (exp b)*(d x b)
+>d x (Exp (Symbol a) (Atom b)) 
+>               | a == x    = (Atom b) * ((Symbol a) ** (Atom (b-1)))
+>               | otherwise = 0
 >d x (Exp a b)  = (a ** b)*((d x a) * b/a + (d x b) * log a)
->d x (Rec a)    = - (d x a)/(a * a)
 >d x (Symbol y) | x == y    = 1
 >               | otherwise = 0
 
@@ -155,3 +158,11 @@ environment.
 >eval env (Sin a)    = sin (eval env a)
 >eval env (Cos a)    = cos (eval env a)
 >eval env (Log a)    = log (eval env a)
+
+
+Now we can do a test run:
+
+>f = (x**3 + 2*x**6)
+>diff x f
+
+will output (3.0 * (x**2.0)) + (12.0 * (x**5.0))
