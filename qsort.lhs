@@ -9,6 +9,9 @@
 >uTrace  = unsafePerformIO . trace
 >trace s = putStrLn $ red ++ (show . length) s ++ clear
 >
+>infixl 0 .--
+>a .-- log =  unsafePerformIO (putStrLn $ show log) `seq` a
+>
 >
 >qsort []     = []
 >qsort (x:xs) =      
