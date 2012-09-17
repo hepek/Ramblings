@@ -1,8 +1,16 @@
 module Tree23 
-       (Tree23 (..),
-        insert,
-        find)
+       (Tree23 (..)
+       , insert
+       , lookup
+--     , delete
+       , fromList
+       , toList)
        where
+import Prelude hiding (lookup)
+
+import Test.QuickCheck
+import Control.Monad
+import qualified Data.Set as S
 
 data Tree23 a = Empty
               | TwoNode a ((Tree23 a), (Tree23 a))
@@ -25,15 +33,15 @@ showTree n (ThreeNode (a,b) (la, bab, gb)) = tabs n ++ show (a,b)
                                                     ++ "\n" ++ tabs n ++ showTree (n+1) gb
 
 -- NOTE: can this be turned into a Monad?
-data Carry a = Tr    (Tree23 a)
-             | Rec a (Tree23 a) (Tree23 a)
-               deriving (Show)
+data Builder a = Tr    (Tree23 a)
+               | Rec a (Tree23 a) (Tree23 a)
+                deriving (Show)
 
 empty  = Empty
 empty2 = (Empty, Empty)
 empty3 = (Empty, Empty, Empty)
 
-insert' :: (Ord a) => a -> Carry a -> Carry a
+insert' :: (Ord a) => a -> Builder a -> Builder a
 insert' x (Tr Empty) = Tr (TwoNode x empty2)
 
 insert' x (Tr (TwoNode y (Empty,Empty)))
@@ -81,18 +89,18 @@ insert x tree = balance $ insert' x (Tr tree)
     balance (Tr tree) = tree
     balance (Rec a l r) = TwoNode a (l,r)
 
-find :: (Ord a) => a -> Tree23 a -> Maybe a
-find _ Empty = Nothing
-find a (TwoNode x (l,g)) 
+lookup :: (Ord a) => a -> Tree23 a -> Maybe a
+lookup _ Empty = Nothing
+lookup a (TwoNode x (l,g))
   | a == x = Just x
-  | a < x  = find a l
-  | a > x  = find a g
-find a (ThreeNode (x,y) (lx, bxy, gy))
+  | a < x  = lookup a l
+  | a > x  = lookup a g
+lookup a (ThreeNode (x,y) (lx, bxy, gy))
   | a == x = Just x
   | a == y = Just y
-  | a < x  = find a lx
-  | a > y  = find a gy
-  | otherwise = find a bxy
+  | a < x  = lookup a lx
+  | a > y  = lookup a gy
+  | otherwise = lookup a bxy
 
 
 fromList :: (Ord a) => [a] -> Tree23 a
@@ -102,4 +110,55 @@ fromList = foldr insert Empty
 toList :: (Ord a) => Tree23 a -> [a]
 toList Empty = []
 toList (TwoNode x (l,g)) = toList l ++ [x] ++ toList g
-toList (ThreeNode (x,y) (lx,bxy,gy)) = toList lx ++ [x] ++ toList bxy ++ [y] ++ toList gy
+toList (ThreeNode (x,y) (lx,bxy,gy)) = toList lx  ++ [x] ++ 
+                                       toList bxy ++ [y] ++ 
+                                       toList gy
+
+------------------------------------------------------------------
+-- tests
+------------------------------------------------------------------
+instance (Ord a, Arbitrary a) => Arbitrary (Tree23 a) where
+  arbitrary = sized $ \n ->
+    do x   <- choose (0,n)
+       lst <- sequence [ arbitrary | _ <- [1..x]]
+       return$ fromList lst
+
+prop_duplicates :: (Eq a, Ord a, Integral a) => [a] -> Bool
+prop_duplicates x = (c == b)
+   where
+     a = foldr insert Empty x
+     b = toList a
+     c = uniq x
+     uniq = S.toList . S.fromList
+     
+prop_duplicates2 :: Int -> Bool     
+prop_duplicates2 x = toList (fromList (replicate 1000 x)) == [x]
+
+-- returns Just depth if tree is balanced
+depth :: (Tree23 a) -> Maybe Int
+depth Empty = Just 0
+depth (TwoNode _ (l,g)) =
+  case (depth l, depth g) of
+    (Just x, Just y) -> 
+      if x == y then Just (1+x) else Nothing
+    _ -> Nothing                                                   
+depth (ThreeNode _ (l,m,g)) =
+  case (depth l, depth m, depth g) of
+    (Just x, Just y, Just z) -> 
+      if x == y && y == z then Just (1+x) else Nothing
+    _ -> Nothing
+
+prop_balance :: Tree23 Int -> Bool
+prop_balance x = 
+  case depth x of
+    Nothing -> False
+    Just _  -> True
+    
+prop_find :: Tree23 Int -> Int -> Bool
+prop_find x y = case lookup y (insert y x) of
+  Nothing -> False
+  Just a  -> a == y
+  
+--prop_delete x y = prop_balance new_tree &&
+--                  find y x /= Nothing
+-- where new_tree = delete y x
