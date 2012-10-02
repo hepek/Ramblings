@@ -13,7 +13,7 @@ import Codec.Compression.GZip
 
 data Trie a b = Tip  (Maybe b)
               | Trie (Maybe b) [(a, Trie a b)]
-              deriving (Show, Generic, Eq)
+              deriving (Generic, Eq)
                        
 instance (Serialize a, Serialize b) => Serialize (Trie a b)
 
@@ -54,16 +54,18 @@ wordToInt (n,trie) word = find word trie
 
 type WordFreq = Trie Char Int
 
-emptyWordF = Tip Nothing
-insertWordF trie word = 
+emptyWordF = Tip Nothing :: WordFreq
+insertWordF trie word = insertWordFN trie word 1
+insertWordFN trie word n =
   case find word trie of
-    Just n -> insert word (n+1) trie
-    Nothing -> insert word 1 trie
+    Just k -> insert word (n+k) trie
+    Nothing -> insert word n trie
+  
 
 enc x  = compress $ BL.fromChunks [encode x]
 dec x  = decode $ BS.concat $ BL.toChunks (decompress x)
 
-main = do 
+main2 = do 
   wrds <- (words . map toLower) <$> readFile "/usr/share/dict/words"
   let dict = foldl' insertWordC emptyWordC wrds
   BL.writeFile "./words.dict.gz" (enc dict)
@@ -72,3 +74,9 @@ readDict :: IO (Either String WordCount)
 readDict = do
   bytes <- BL.readFile "./words.dict.gz"
   return (dec bytes)
+  
+main = do
+  lns <- lines <$> readFile "./goog2.csv"
+  let dict = foldl' insertWordF emptyWordF lns
+  BL.writeFile "./goog.dict.gz" (enc dict)
+  print "done"
