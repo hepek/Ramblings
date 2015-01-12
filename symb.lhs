@@ -38,7 +38,7 @@ our newly created type Expr an instance of Num (+,-,*,etc), Fractional
 
 >instance (Num a) => Num (Expr a) where
 >  (+) = Sum
->  (-) = flip Sum . Neg
+>  a - b = Sum a (Neg b)
 >  (*) = Prod
 >  negate = Neg
 >  signum = undefined
@@ -99,7 +99,7 @@ two auxiliary functions that will be used for computing partial
 derivatives of functions. s simplifies an expression, d calculates its
 derivative. Both work by simple pattern matching over our Expr AST.
 
->s :: (Fractional a) => Expr a -> Expr a
+>s :: (Fractional a, Eq a) => Expr a -> Expr a
 >s (Sum (Atom a) (Atom b))  = Atom (a+b)
 >s (Prod (Atom a) (Atom b)) = Atom (a*b)
 >s (Sum (Atom 0) a)  = s a
@@ -162,7 +162,7 @@ environment.
 
 Now we can do a test run:
 
->f = (x**3 + 2*x**6)
->diff x f
+-->f = (x**3 + 2*x**6)
+-->diff x f
 
 will output (3.0 * (x**2.0)) + (12.0 * (x**5.0))
